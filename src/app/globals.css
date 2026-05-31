@@ -450,11 +450,6 @@ button:disabled {
     order: -1;
   }
 
-  .record-panel {
-    position: sticky;
-    top: 8px;
-    z-index: 2;
-  }
 
   .record-panel strong {
     font-size: 30px;
