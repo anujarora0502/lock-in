@@ -46,6 +46,16 @@ type DayStat = {
 
 const colors = ["#111827", "#2563eb", "#16a34a", "#dc2626", "#7c3aed", "#ea580c"];
 
+function getAuthRedirectUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
+  if (configuredUrl) {
+    return configuredUrl.endsWith("/") ? configuredUrl.slice(0, -1) : configuredUrl;
+  }
+
+  return window.location.origin;
+}
+
 function dateKey(date: Date) {
   return date.toLocaleDateString("en-CA");
 }
@@ -203,7 +213,7 @@ export default function Home() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: getAuthRedirectUrl(),
       },
     });
 
