@@ -9,14 +9,12 @@ import {
   CircleStop,
   Clock3,
   Flame,
-  LogOut,
   Pencil,
   Plus,
   TimerReset,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 type LockType = {
@@ -46,15 +44,6 @@ type DayStat = {
 
 const colors = ["#111827", "#2563eb", "#16a34a", "#dc2626", "#7c3aed", "#ea580c"];
 
-function getAuthRedirectUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-  if (configuredUrl) {
-    return configuredUrl.endsWith("/") ? configuredUrl.slice(0, -1) : configuredUrl;
-  }
-
-  return window.location.origin;
-}
 
 function dateKey(date: Date) {
   return date.toLocaleDateString("en-CA");
@@ -143,9 +132,6 @@ function splitSessionByDay(startedAt: Date, endedAt: Date) {
 }
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-  const [email, setEmail] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
   const [types, setTypes] = useState<LockType[]>([]);
   const [sessions, setSessions] = useState<LockSession[]>([]);
   const [selectedType, setSelectedType] = useState<string>("total");
@@ -161,17 +147,6 @@ export default function Home() {
   const [isBusy, setIsBusy] = useState(false);
   const [appMessage, setAppMessage] = useState("");
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 1000);
@@ -200,33 +175,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      return;
-    }
-
     loadData();
-  }, [loadData, user]);
-
-  async function sendMagicLink() {
-    setIsBusy(true);
-    setAuthMessage("");
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: getAuthRedirectUrl(),
-      },
-    });
-
-    setIsBusy(false);
-    setAuthMessage(error ? error.message : "Check your email for the sign-in link.");
-  }
+  }, [loadData]);
 
   async function addType() {
-    if (!user) {
-      setAppMessage("Please sign in before adding a type.");
-      return;
-    }
-
     if (!newTypeName.trim()) {
       setAppMessage("Enter a lock-in type name first.");
       return;
@@ -237,7 +189,6 @@ export default function Home() {
     const { data, error } = await supabase
       .from("lock_in_types")
       .insert({
-        user_id: user.id,
         name: newTypeName.trim(),
         color: newTypeColor,
       })
@@ -320,7 +271,7 @@ export default function Home() {
   }
 
   async function stopRecording() {
-    if (!user || !recordingStartedAt) {
+    if (!recordingStartedAt) {
       setAppMessage("No active recording to stop.");
       return;
     }
@@ -334,7 +285,6 @@ export default function Home() {
     const { data, error } = await supabase
       .from("lock_in_sessions")
       .insert(segments.map((segment) => ({
-        user_id: user.id,
         type_id: activeRecordType,
         started_at: segment.startedAt.toISOString(),
         ended_at: segment.endedAt.toISOString(),
@@ -414,32 +364,6 @@ export default function Home() {
     ? Math.max(0, Math.round((now.getTime() - recordingStartedAt.getTime()) / 1000))
     : 0;
 
-  if (!user) {
-    return (
-      <main className="auth-shell">
-        <section className="auth-panel">
-          <div className="brand-mark">
-            <Flame size={30} />
-          </div>
-          <h1>Lock In</h1>
-          <p>Track focused work and study blocks, then watch the last 10 days stack up.</p>
-          <div className="auth-form">
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
-            />
-            <button disabled={isBusy || !email} onClick={sendMagicLink}>
-              Send magic link
-            </button>
-          </div>
-          {authMessage && <p className="auth-message">{authMessage}</p>}
-        </section>
-      </main>
-    );
-  }
-
   return (
     <main className="app-shell">
       <header className="top-bar">
@@ -447,9 +371,6 @@ export default function Home() {
           <p className="eyebrow">Today is for focus</p>
           <h1>Lock In</h1>
         </div>
-        <button className="icon-button" aria-label="Sign out" onClick={() => supabase.auth.signOut()}>
-          <LogOut size={20} />
-        </button>
       </header>
 
       <section className="record-panel">

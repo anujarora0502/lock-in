@@ -1,17 +1,15 @@
 -- Supabase Database Schema for Lock In
+-- Single-user setup with no login. Run this in the Supabase SQL editor.
 
-CREATE TABLE lock_in_types (
+CREATE TABLE IF NOT EXISTS lock_in_types (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
   color TEXT DEFAULT '#111827' NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  UNIQUE (user_id, name)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-CREATE TABLE lock_in_sessions (
+CREATE TABLE IF NOT EXISTS lock_in_sessions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   type_id UUID REFERENCES lock_in_types(id) ON DELETE SET NULL,
   started_at TIMESTAMP WITH TIME ZONE NOT NULL,
   ended_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -20,43 +18,36 @@ CREATE TABLE lock_in_sessions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-CREATE INDEX lock_in_sessions_user_started_idx
-  ON lock_in_sessions (user_id, started_at DESC);
+-- If you previously ran the auth-based schema, this removes the user dependency.
+DROP POLICY IF EXISTS "Users can view their own lock in types." ON lock_in_types;
+DROP POLICY IF EXISTS "Users can insert their own lock in types." ON lock_in_types;
+DROP POLICY IF EXISTS "Users can update their own lock in types." ON lock_in_types;
+DROP POLICY IF EXISTS "Users can delete their own lock in types." ON lock_in_types;
+DROP POLICY IF EXISTS "Users can view their own lock in sessions." ON lock_in_sessions;
+DROP POLICY IF EXISTS "Users can insert their own lock in sessions." ON lock_in_sessions;
+DROP POLICY IF EXISTS "Users can update their own lock in sessions." ON lock_in_sessions;
+DROP POLICY IF EXISTS "Users can delete their own lock in sessions." ON lock_in_sessions;
 
-CREATE INDEX lock_in_sessions_user_type_started_idx
-  ON lock_in_sessions (user_id, type_id, started_at DESC);
+ALTER TABLE lock_in_types DISABLE ROW LEVEL SECURITY;
+ALTER TABLE lock_in_sessions DISABLE ROW LEVEL SECURITY;
 
-ALTER TABLE lock_in_types ENABLE ROW LEVEL SECURITY;
-ALTER TABLE lock_in_sessions ENABLE ROW LEVEL SECURITY;
+DROP INDEX IF EXISTS lock_in_sessions_user_started_idx;
+DROP INDEX IF EXISTS lock_in_sessions_user_type_started_idx;
+ALTER TABLE lock_in_types DROP CONSTRAINT IF EXISTS lock_in_types_user_id_name_key;
+ALTER TABLE lock_in_types DROP CONSTRAINT IF EXISTS lock_in_types_user_id_fkey;
+ALTER TABLE lock_in_sessions DROP CONSTRAINT IF EXISTS lock_in_sessions_user_id_fkey;
+ALTER TABLE lock_in_sessions DROP COLUMN IF EXISTS user_id;
+ALTER TABLE lock_in_types DROP COLUMN IF EXISTS user_id;
 
-CREATE POLICY "Users can view their own lock in types." ON lock_in_types
-  FOR SELECT USING (auth.uid() = user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS lock_in_types_name_unique_idx
+  ON lock_in_types (lower(name));
 
-CREATE POLICY "Users can insert their own lock in types." ON lock_in_types
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS lock_in_sessions_started_idx
+  ON lock_in_sessions (started_at DESC);
 
-CREATE POLICY "Users can update their own lock in types." ON lock_in_types
-  FOR UPDATE USING (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS lock_in_sessions_type_started_idx
+  ON lock_in_sessions (type_id, started_at DESC);
 
-CREATE POLICY "Users can delete their own lock in types." ON lock_in_types
-  FOR DELETE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view their own lock in sessions." ON lock_in_sessions
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert their own lock in sessions." ON lock_in_sessions
-  FOR INSERT WITH CHECK (
-    auth.uid() = user_id AND (
-      type_id IS NULL OR EXISTS (
-        SELECT 1 FROM lock_in_types
-        WHERE lock_in_types.id = lock_in_sessions.type_id
-          AND lock_in_types.user_id = auth.uid()
-      )
-    )
-  );
-
-CREATE POLICY "Users can update their own lock in sessions." ON lock_in_sessions
-  FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own lock in sessions." ON lock_in_sessions
-  FOR DELETE USING (auth.uid() = user_id);
+GRANT USAGE ON SCHEMA public TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON lock_in_types TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON lock_in_sessions TO anon;
