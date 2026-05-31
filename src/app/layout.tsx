@@ -1,9 +1,20 @@
 import type { Metadata, Viewport } from "next";
+import { PwaSetup } from "./pwa";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Lock In",
   description: "Track focused study and work sessions.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Lock In",
+  },
 };
 
 export const viewport: Viewport = {
@@ -20,7 +31,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <PwaSetup />
+        {children}
+      </body>
     </html>
   );
 }
